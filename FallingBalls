@@ -1,0 +1,507 @@
+MAIN:
+
+#include <iostream>
+#include "SDL_PLOTTER.H"
+#include "Ball.h"
+#include "rect.h"
+
+using namespace std;
+
+int main(int argc, char** argb)
+{
+    char key;
+    bool isLaunched = false, active = false, createRects = true, gameActive = false;
+    vector <Rect> rects;
+    SDL_Plotter g(800,600);
+    Ball b;
+    int mouseX, mouseY;
+    SDL_Event e;
+    while(!g.getQuit()){
+        SDL_GetMouseState(&mouseX, &mouseY);
+        if(g.kbhit()){
+            key = g.getKey();
+            switch(toupper(key)){
+                case 'C': g.clear();
+                break;
+                case 'A': isLaunched = true;
+                break;
+            }
+        }
+        if(isLaunched){
+            //launch
+            b.setxSpeed(((400-mouseX) * -1) *0.003);
+            b.setySpeed(mouseY * 0.0008);
+            isLaunched = false;
+            gameActive = true;
+            b.setActive(true);
+        }
+        //update:
+        for(unsigned int i = 0; i < rects.size(); i++){
+            rects[i].display(g, false);
+            if(rects[i].getYpos() <= 0){
+                    g.setQuit(true);
+            }
+            rects[i].Bounce(b);
+        }
+        b.display(g, false);
+        g.update();
+        b.display(g, true);
+        if(b.getActive()){
+            b.move();
+        }
+        else if (gameActive && b.getReset()){
+            createRects = true;
+            for(unsigned int i = 0; i < rects.size(); i++){
+                rects[i].display(g, true);
+                rects[i].setLocation(rects[i].getXpos(), rects[i].getYpos() - 133);
+            }
+        }
+        if(createRects){
+            for(int i = 0; i <= 3; i++){
+                Rect r1((rand()% 100) + i * 150, color(rand()%255, rand()%255, rand()%255));
+                rects.push_back(r1);
+            }
+            createRects = false;
+            b.setReset(false);
+            b.setActive(false);
+            cout << "1" << endl;
+        }
+    }
+
+    return 0;
+}
+
+Ball.h: 
+
+#ifndef BALL_H_INCLUDED
+#define BALL_H_INCLUDED
+#include "SDL_Plotter.h"
+#include "Force.h"
+#include <cmath>
+
+using namespace std;
+
+struct point_t{
+    double x,y;
+    point_t(){
+        x = y = 0;
+    }
+
+    point_t(double x, double y){
+        this->x = x;
+        this->y = y;
+    }
+};
+class Ball{
+    private:
+        point_t loc;
+        color c;
+        int radius;
+        double xSpeed, ySpeed, gravity;
+        double PI = 3.1415967;
+		bool active, reset;
+    public:
+        Ball();
+
+        void setColor(color);
+        void setLocation(point_t);
+        void setRadius(int);
+        int getRadius() const;
+        point_t getLocation() const;
+        color getColor() const;
+        void display(SDL_Plotter&, bool = false);
+        bool getActive() const;
+        void setActive(bool);
+        bool getReset() const;
+        void setReset(bool);
+        void move();
+        void setxSpeed(double xs);
+        void setySpeed(double ys);
+        double getySpeed() const;
+        double getxSpeed() const;
+        double getGravity() const;
+
+};
+
+#endif // BALL_H_INCLUDED
+
+
+
+
+
+
+Ball.cpp:
+#include "Ball.h"
+
+Ball::Ball(){
+    loc.x = 400;
+    loc.y = 20;
+    c.R = 255;
+    c.G = 100;
+    c.B = 133;
+    xSpeed = 0;
+    active = false;
+    reset = false;
+    ySpeed = 0;
+    gravity = 0.009;
+    radius = 15;
+}
+
+void Ball::setColor(color c1){
+    c = c1;
+}
+
+void Ball::setLocation(point_t p){
+    loc = p;
+}
+
+void Ball::setxSpeed(double xs){
+    xSpeed = xs;
+}
+
+void Ball::setySpeed(double ys){
+    ySpeed = ys;
+}
+
+void Ball::setRadius(int r){
+    radius = r;
+}
+
+int Ball::getRadius() const{
+    return radius;
+}
+
+color Ball::getColor() const{
+    return c;
+}
+
+point_t Ball::getLocation() const{
+    return loc;
+}
+
+double Ball::getGravity() const{
+    return gravity;
+}
+
+
+void Ball::display(SDL_Plotter& g, bool ERASE){
+    color _c = c;
+    if(ERASE){
+        _c.R = 255;
+        _c.G = 255;
+        _c.B = 255;
+    }
+    for(int x = -radius; x <= radius; x++){
+        for(int y = -radius; y <= radius; y++){
+            if((sqrt(pow(x,2) + pow(y, 2)) <= radius)){
+                g.plotPixel(x + loc.x, y + loc.y, _c);
+            }
+        }
+    }
+}
+
+double Ball::getySpeed() const{
+    return ySpeed;
+}
+
+double Ball::getxSpeed() const{
+    return xSpeed;
+}
+
+
+bool Ball::getActive() const{
+    return active;
+}
+
+void Ball::setActive(bool a){
+    active = a;
+}
+
+bool Ball::getReset()const{
+    return reset;
+}
+
+void Ball::setReset(bool r){
+    reset = r;
+}
+
+void Ball::move(){
+   loc.x += xSpeed;
+   loc.y += ySpeed;
+   ySpeed += gravity;
+   if(loc.x < radius){
+        xSpeed *= -1;
+        loc.x = radius;
+   }
+   if(loc.x > 600 - radius){
+        xSpeed *= -1;
+        loc.x = 600 - radius;
+   }
+   if(loc.y > 800){
+        ySpeed *= -1;
+        loc.y = 20;
+        loc.x = 400;
+        reset = true;
+        ySpeed = 0;
+        xSpeed = 0;
+        active = false;
+        //gravity *= 1.3;
+   }
+}
+
+
+Rect.h:
+#ifndef RECT_H_INCLUDED
+#define RECT_H_INCLUDED
+#include "SDL_Plotter.h"
+#include "Force.h"
+#include "Ball.h"
+#include <cmath>
+using namespace std;
+class Rect{
+    private:
+        double xpos, ypos;
+        color c;
+        int width;
+        int height;
+        int lives;
+
+    public:
+        Rect();
+        Rect(double, color);
+        void setColor(color);
+        void setLocation(double, double);
+        void setWidth(int);
+        void setHeight(int);
+
+        int getWidth() const;
+        int getHeight() const;
+        double getXpos() const;
+        double getYpos() const;
+        color getColor() const;
+        void Bounce(Ball&);
+
+        void display(SDL_Plotter&, bool = false);
+        void move();
+};
+
+#endif // RECT_H_INCLUDED
+
+Rect.cpp:
+#include "Rect.h"
+#include <cmath>
+Rect::Rect(double x, color c1){
+    xpos = x;
+    ypos = 700;
+    c = c1;
+    width = rand() % 50 + 30;
+    height = 40;
+    lives = rand() % 3 + 1;
+}
+
+void Rect::setColor(color c1){
+    c = c1;
+}
+
+void Rect::setLocation(double x, double y){
+    xpos = x;
+    ypos = y;
+}
+
+color Rect::getColor() const{
+    return c;
+}
+
+double Rect::getXpos() const{
+    return xpos;
+}
+
+double Rect::getYpos() const{
+    return ypos;
+}
+
+void Rect::setWidth(int w){
+    width = w;
+}
+
+void Rect::setHeight(int h){
+    height = h;
+}
+
+int Rect::getWidth() const{
+    return width;
+}
+
+int Rect::getHeight() const{
+    return height;
+}
+
+void Rect::Bounce(Ball& b){
+    point_t p;
+    if(lives > 0){
+    if(b.getLocation().x + 10 >= xpos &&
+       b.getLocation().x - 10 <= xpos + width){
+        if(b.getLocation().y + b.getRadius() > ypos &&
+           b.getLocation().y + b.getRadius() < ypos + height){
+            b.setySpeed(b.getySpeed() * -0.7);
+            p.x = b.getLocation().x;
+            p.y = b.getLocation().y-1;
+            b.setLocation(p);
+            lives--;
+        }
+        else if(b.getLocation().y - b.getRadius() < ypos + height
+                && b.getLocation().y - b.getRadius() > ypos
+                && b.getySpeed() < 0){
+            b.setySpeed(b.getySpeed() * -0.7);
+            p.x = b.getLocation().x;
+            p.y = b.getLocation().y;
+            b.setLocation(p);
+            lives--;
+        }
+       }
+    if(b.getLocation().y + 10 >= ypos &&
+       b.getLocation().y - 10 <= ypos + height){
+        if(b.getLocation().x + b.getRadius() > xpos &&
+           b.getLocation().x + b.getRadius() < xpos + width){
+            b.setxSpeed(b.getxSpeed() * -0.7);
+            p.x = b.getLocation().x;
+            p.y = b.getLocation().y;
+            b.setLocation(p);
+            lives--;
+        }
+        else if(b.getLocation().x - b.getRadius() < xpos + width &&
+           b.getLocation().x - b.getRadius() > xpos && b.getxSpeed() < 0){
+            b.setxSpeed(b.getxSpeed() * -0.7);
+            p.x = b.getLocation().x;
+            p.y = b.getLocation().y;
+            b.setLocation(p);
+            lives--;
+        }
+       }
+    }
+}
+
+void Rect::display(SDL_Plotter& g, bool ERASE){
+    color _c = c;
+    if(lives <= 0){
+        ERASE = true;
+    }
+    if(ERASE){
+        _c.R = 255;
+        _c.G = 255;
+        _c.B = 255;
+    }
+    for(int x = 0; x <= width; x++){
+        for(int y = 0; y <= height; y++){
+            g.plotPixel(x + xpos, y + ypos, _c);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void Ball::move(){
+   loc.x += xSpeed;
+   loc.y += ySpeed;
+   ySpeed += gravity;
+   if(loc.x < radius){
+        xSpeed *= -1;
+        loc.x = radius;
+   }
+   if(loc.x > 600 - radius){
+        xSpeed *= -1;
+        loc.x = 600 - radius;
+   }
+   if(loc.y > 800){
+        ySpeed *= -1;
+        loc.y = 20;
+        loc.x = 400;
+        reset = true;
+        ySpeed = 0;
+        xSpeed = 0;
+        active = false;
+        //gravity *= 1.3;
+   }
+}
+
+
+
+double Ball::getySpeed() const{
+    return ySpeed;
+}
+
+double Ball::getxSpeed() const{
+    return xSpeed;
+}
+
+
+bool Ball::getActive(){
+    return active;
+}
+
+void Ball::setActive(bool a){
+    active = a;
+}
+
+bool Ball::getReset(){
+    return reset;
+}
+
+void Ball::setReset(bool r){
+    reset = r;
+}
+double Ball::getGravity() const{
+    return gravity;
+}
+
+void Ball::setxSpeed(double xs){
+    xSpeed = xs;
+}
+
+void Ball::setySpeed(double ys){
+    ySpeed = ys;
+}
